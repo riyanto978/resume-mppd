@@ -11,6 +11,7 @@ import {
   Table,
   Row,
   FlexboxGrid,
+  SelectPicker,
 } from "rsuite";
 import type { DateRange } from "rsuite/esm/DateRangePicker";
 import { axiosClient } from "../config/axios";
@@ -21,6 +22,7 @@ import DateRangeComponent from "../components/DateRangeComponent";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Pie } from "react-chartjs-2";
 import ChartDataLabels from "chartjs-plugin-datalabels";
+import GeoComponent from "../components/GeoComponent";
 
 ChartJS.register(ArcElement, Tooltip, Legend, ChartDataLabels);
 
@@ -43,15 +45,17 @@ const ResumeByDistrict = () => {
     addDays(startOfMonth(new Date()), -1),
   ]);
 
+  const [tipe, settipe] = useState<string>("");
+
   const { data = [] } = useQuery<ResumeType>({
-    queryKey: ["resume-district", range],
+    queryKey: ["resume-district", range, tipe],
     queryFn: async () => {
       try {
         let result = await axiosClient.get<[]>(
           `resume/district?startDate=${format(
             range[0],
             "y-MM-dd"
-          )}&endDate=${format(range[1], "y-MM-dd")}`
+          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}`
         );
 
         return result.data;
@@ -62,14 +66,14 @@ const ResumeByDistrict = () => {
   });
 
   const { data: resumeTotal = [0, 0] } = useQuery<[number, number]>({
-    queryKey: ["resume-total", range],
+    queryKey: ["resume-total", range, tipe],
     queryFn: async () => {
       try {
         let result = await axiosClient.get<[number, number]>(
           `resume/total?startDate=${format(
             range[0],
             "y-MM-dd"
-          )}&endDate=${format(range[1], "y-MM-dd")}`
+          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}`
         );
 
         return result.data;
@@ -88,6 +92,33 @@ const ResumeByDistrict = () => {
       >
         <FlexboxGridItem>
           <DateRangeComponent onChange={setRange} range={range} />
+        </FlexboxGridItem>
+
+        <FlexboxGridItem>
+          <SelectPicker
+            label="Tipe"
+            value={tipe}
+            onChange={(e) => {
+              if (e != null) {
+                settipe(e);
+              }
+            }}
+            placeholder="Pilih Tipe"
+            data={[
+              {
+                label: "Semua",
+                value: "",
+              },
+              {
+                label: "Nakes",
+                value: "nakes",
+              },
+              {
+                label: "Named",
+                value: "named",
+              },
+            ]}
+          />
         </FlexboxGridItem>
       </FlexboxGrid>
       <FlexboxGrid>
@@ -129,32 +160,8 @@ const ResumeByDistrict = () => {
           </table>
         </FlexboxGridItem>
 
-        <FlexboxGridItem colspan={6}>
-          {/* <GeoComponent /> */}
-
-          <Pie
-            options={{
-              plugins: {
-                datalabels: {
-                  color: "#FFF",
-                },
-              },
-            }}
-            data={{
-              labels: ["Ditolak", "SK Diterbitkan"],
-              datasets: [
-                {
-                  label: "# total",
-                  data: resumeTotal,
-                  backgroundColor: [
-                    "rgba(255, 99, 132, 1)",
-                    "rgba(54, 162, 235, 1)",
-                  ],
-                  borderWidth: 1,
-                },
-              ],
-            }}
-          ></Pie>
+        <FlexboxGridItem colspan={12}>
+          <GeoComponent data={data} resumeTotal={resumeTotal} />
         </FlexboxGridItem>
       </FlexboxGrid>
     </>

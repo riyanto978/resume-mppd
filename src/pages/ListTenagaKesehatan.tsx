@@ -6,9 +6,11 @@ import {
   FlexboxGrid,
   Footer,
   Header,
+  InputGroup,
   Nav,
   Navbar,
   Pagination,
+  SelectPicker,
   Table,
 } from "rsuite";
 import { FaCog } from "react-icons/fa";
@@ -42,18 +44,19 @@ export const ListTenagaKesehatan = () => {
   const [total, settotal] = useState(0);
   const [activePage, setActivePage] = useState(1);
   const [limit, setlimit] = useState(10);
+  const [tipe, settipe] = useState<string>("");
 
   const [profesi, setprofesi] = useState<string[]>([]);
 
   const { data: rangeProfesi = [] } = useQuery<groupReturnType>({
-    queryKey: ["list-nakes", range],
+    queryKey: ["list-nakes", range, tipe],
     queryFn: async () => {
       try {
         let result = await axiosClient.get<[]>(
           `group-nakes?startDate=${format(
             range[0],
             "y-MM-dd"
-          )}&endDate=${format(range[1], "y-MM-dd")}`
+          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}`
         );
 
         setprofesi([]);
@@ -66,7 +69,7 @@ export const ListTenagaKesehatan = () => {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["list-nakes", activePage, limit, range, profesi],
+    queryKey: ["list-nakes", activePage, limit, range, profesi, tipe],
     queryFn: async () => {
       try {
         let prof = profesi
@@ -79,7 +82,7 @@ export const ListTenagaKesehatan = () => {
           `list-nakes?${prof}&page=${activePage}&limit=${limit}&startDate=${format(
             range[0],
             "y-MM-dd"
-          )}&endDate=${format(range[1], "y-MM-dd")}`
+          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}`
         );
 
         settotal(result.data.total);
@@ -96,6 +99,32 @@ export const ListTenagaKesehatan = () => {
         <FlexboxGridItem colspan={4}>
           <DateRangeComponent onChange={setRange} range={range} />
         </FlexboxGridItem>
+        <FlexboxGridItem colspan={4}>
+          <SelectPicker
+            label="Tipe"
+            value={tipe}
+            onChange={(e) => {
+              if (e != null) {
+                settipe(e);
+              }
+            }}
+            placeholder="Pilih Tipe"
+            data={[
+              {
+                label: "Semua",
+                value: "",
+              },
+              {
+                label: "Nakes",
+                value: "nakes",
+              },
+              {
+                label: "Named",
+                value: "named",
+              },
+            ]}
+          />
+        </FlexboxGridItem>
 
         <FlexboxGridItem colspan={4}>
           {rangeProfesi.length > 0 && (
@@ -107,7 +136,7 @@ export const ListTenagaKesehatan = () => {
                 value: e.profesi,
               }))}
               appearance="default"
-              placeholder="Default"
+              placeholder="Semua profesi"
               onSelect={(e) => {
                 if (e) {
                   setprofesi(e);
@@ -120,7 +149,7 @@ export const ListTenagaKesehatan = () => {
 
       <Table height={400} data={data} bordered>
         <Column flexGrow={1} align="center" fixed>
-          <HeaderCell>Id</HeaderCell>
+          <HeaderCell>No</HeaderCell>
 
           <Cell>
             {(rowData, index) => (activePage - 1) * limit + (index ?? 0) + 1}

@@ -1,98 +1,176 @@
-//@ts-nocheck
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-} from "chart.js";
-import {
-  ChoroplethController,
-  BubbleMapController,
-  ProjectionScale,
-  ColorScale,
-  SizeScale,
-  topojson,
-  GeoFeature,
-} from "chartjs-chart-geo";
-import { Chart } from "react-chartjs-2";
+import { MapContainer } from "react-leaflet/MapContainer";
+import { TileLayer } from "react-leaflet/TileLayer";
+import { GeoJSON } from "react-leaflet";
 
-ChartJS.register(
-  Title,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  ChoroplethController, // or BubbleMapController
-  ProjectionScale,
-  ColorScale, // for choropleth charts
-  SizeScale // for bubble maps
-);
+import { semarangData } from "../assets/semarang";
+import { useRef, useState } from "react";
+import type {
+  LeafletMouseEvent,
+  GeoJSON as LeafletGeoJSON,
+  Layer,
+} from "leaflet";
+import type { Feature, Geometry } from "geojson";
 
-import jatengJson from "../assets/jateng.json";
-import us from "../assets/us.json";
-import { useEffect, useState } from "react";
+type GeoComponentType = {
+  data: {
+    sk_terbit: number;
+    ditolak: number;
+    kecamatan: string;
+  }[];
+  resumeTotal: [number, number];
+};
 
-const GeoComponent = () => {
-  const [chartData, setChartData] = useState(null);
-
-  useEffect(() => {
-    const nation = topojson.feature(us, us.objects.nation).features;
-    const district = topojson.feature(us, us.objects.states).features;
-    console.log(nation);
-    console.log(district);
-
-    const jateng = topojson.feature(
-      jatengJson,
-      jatengJson.objects["jawa-tengah"]
-    ).features;
-    console.log(jateng);
-
-    // const kota = topojson.feature(jatengJson, jatengJson.objects["jawa-tengah"]).features[0]
-    // const jateng = topojson.feature(
-    //   jatengJson,
-    //   jatengJson.objects["jawa-tengah"]
-    // ).features[0];
-
-    const config = {
-      labels: "JAWA Tengah",
-      datasets: [
-        {
-          label: "States",
-          outline: jateng[0],
-          data: [
-            {
-              feature: "dsadna",
-              value: 1,
-            },
-          ],
-        },
-      ],
-    };
-
-    setChartData({
-      data: config,
-      options: {
-        plugins: {
-          legend: {
-            display: false,
-          },
-        },
-      },
-    });
-  }, []);
-  if (!chartData) return <div>Loading chart...</div>;
+const GeoComponent = ({ data, resumeTotal }: GeoComponentType) => {
+  const geoRef = useRef<LeafletGeoJSON<any, Geometry>>(null);
+  const [kecamatan, setkecamatan] = useState("");
+  const [total, setTotal] = useState([0, 0]);
 
   return (
-    <div style={{ width: "100%", height: "500px" }}>
-      <Chart
-        type="choropleth"
-        data={chartData.data}
-        options={chartData.options}
-      />
-    </div>
+    <>
+      <div style={{ position: "relative", width: "100%", height: "600px" }}>
+        <MapContainer
+          style={{ height: "100%", minHeight: "100%" }}
+          center={[-7.015, 110.42]}
+          zoom={12.45}
+          zoomControl={false}
+          scrollWheelZoom={false}
+        >
+          {/* <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={19}
+          /> */}
+
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png"
+            attribution="©OpenStreetMap, ©CartoDB"
+          />
+          {/* <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"
+            attribution="©OpenStreetMap, ©CartoDB"
+          /> */}
+
+          <GeoJSON
+            ref={geoRef}
+            key={JSON.stringify(data)}
+            data={semarangData}
+            filter={(e) => {
+              let districtName = e.properties.name;
+
+              let findtotalByDistrict = data.find(
+                (e) =>
+                  e.kecamatan.toLocaleLowerCase() ==
+                  districtName.toLocaleLowerCase()
+              );
+
+              if (findtotalByDistrict) {
+                return true;
+              }
+
+              return false;
+            }}
+            onEachFeature={(feature: Feature<Geometry, any>, layer: Layer) => {
+              layer.on({
+                mouseover: (e: LeafletMouseEvent) => {
+                  let districtName = e.target.feature.properties.name;
+                  layer.bindPopup(districtName).openPopup();
+
+                  e.target.setStyle({
+                    weight: 20,
+                    color: "#666",
+                    dashArray: "",
+                    fillOpacity: 0.7,
+                  });
+
+                  e.target.bringToFront();
+
+                  let findtotalByDistrict = data.find(
+                    (e) =>
+                      e.kecamatan.toLocaleLowerCase() ==
+                      districtName.toLocaleLowerCase()
+                  );
+
+                  let totalByDistrict: [number, number] =
+                    findtotalByDistrict == undefined
+                      ? [0, 0]
+                      : [
+                          findtotalByDistrict.ditolak,
+                          findtotalByDistrict.sk_terbit,
+                        ];
+
+                  setkecamatan(districtName);
+                  setTotal(totalByDistrict);
+                },
+                mouseout: (e) => {
+                  geoRef.current?.resetStyle(e.target);
+                  layer.unbindPopup();
+                  setkecamatan("");
+                  setTotal([0, 0]);
+                },
+              });
+            }}
+            style={(e) => {
+              return {
+                weight: 2,
+                fillOpacity: 0.7,
+                fillColor: "#FED976",
+                dashArray: "3",
+              };
+            }}
+          ></GeoJSON>
+        </MapContainer>
+
+        <div
+          style={{
+            position: "absolute",
+            width: 150,
+            height: 100,
+            background: "#FFF",
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+          }}
+        >
+          {kecamatan == "" ? (
+            <div>
+              Kota Semarang
+              <br />- ditolak - {resumeTotal[0]}
+              <br />- Sk Terbit - {resumeTotal[1]}
+            </div>
+          ) : (
+            <div>
+              kec {kecamatan}
+              <br />- ditolak - {total[0]}
+              <br />- Sk Terbit - {total[1]}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 };
 
 export default GeoComponent;
+
+// layer.setPopupContent(PopUpGeo)
+// layer.on("mouseover", function (e) {
+//   // console.log(e.target.bringToFront());
+//   e.target.setStyle({
+//     weight: 5,
+//     color: "#666",
+//     dashArray: "",
+//     fillOpacity: 1,
+//   });
+//   layer.bindPopup(contryName).openPopup(); // here add openPopup()
+// });
+// layer.on("mouseout", function (e) {
+//   console.log(e.target);
+//   e.target.setStyle({
+//     weight: 2,
+//     fillOpacity: 1,
+//     fillColor: "#FED976",
+//     dashArray: "3",
+//   });
+//   // layer.unbindPopup();
+//   // layer.bindPopup(contryName).openPopup(); // here add openPopup()
+// });
