@@ -8,15 +8,19 @@ import type {
   LeafletMouseEvent,
   GeoJSON as LeafletGeoJSON,
   Layer,
+  PathOptions,
 } from "leaflet";
 import type { Feature, Geometry } from "geojson";
+import { Button, ButtonGroup } from "rsuite";
+
+type datasType = {
+  sk_terbit: number;
+  ditolak: number;
+  kecamatan: string;
+}[];
 
 type GeoComponentType = {
-  data: {
-    sk_terbit: number;
-    ditolak: number;
-    kecamatan: string;
-  }[];
+  data: datasType;
   resumeTotal: [number, number];
 };
 
@@ -24,10 +28,66 @@ const GeoComponent = ({ data, resumeTotal }: GeoComponentType) => {
   const geoRef = useRef<LeafletGeoJSON<any, Geometry>>(null);
   const [kecamatan, setkecamatan] = useState("");
   const [total, setTotal] = useState([0, 0]);
+  const [status, setStatus] = useState<"ditolak" | "terbit">("terbit");
+
+  const getColor = (
+    datas: datasType,
+    layer: Feature<Geometry, any>
+  ): PathOptions => {
+    let min = Math.min(
+      ...datas.map((o) => (status == "ditolak" ? o.ditolak : o.sk_terbit))
+    );
+    let max = Math.max(
+      ...datas.map((o) => (status == "ditolak" ? o.ditolak : o.sk_terbit))
+    );
+    let rangeMinMax = max - min;
+    let range1 = min + (rangeMinMax * 1) / 6;
+    let range2 = min + (rangeMinMax * 2) / 6;
+    let range3 = min + (rangeMinMax * 3) / 6;
+    let range4 = min + (rangeMinMax * 4) / 6;
+    let range5 = min + (rangeMinMax * 5) / 6;
+
+    let districtName = layer.properties.name;
+
+    let findtotalByDistrict = data.find(
+      (ev) =>
+        ev.kecamatan.toLocaleLowerCase() == districtName.toLocaleLowerCase()
+    );
+
+    if (!findtotalByDistrict) return {};
+
+    let districtValue =
+      findtotalByDistrict[status == "ditolak" ? "ditolak" : "sk_terbit"];
+
+    let color = "";
+    if (districtValue > range5) {
+      color = status == "ditolak" ? "#c10007" : "#008236";
+    } else if (districtValue > range4) {
+      color = status == "ditolak" ? "#e7000b" : "#00a63e";
+    } else if (districtValue > range3) {
+      color = status == "ditolak" ? "#fb2c36" : "#00c950";
+    } else if (districtValue > range2) {
+      color = status == "ditolak" ? "#ff6467" : "#05df72";
+    } else if (districtValue > range1) {
+      color = status == "ditolak" ? "#ffa2a2" : "#7bf1a8";
+    } else {
+      color = status == "ditolak" ? "#ffc9c9" : "#b9f8cf";
+    }
+
+    return {
+      weight: 2,
+      fillOpacity: 0.7,
+      fillColor: color,
+      dashArray: "3",
+    };
+  };
 
   return (
     <>
-      <div style={{ position: "relative", width: "100%", height: "600px" }}>
+      <div className="bg-red-200 "></div>
+      <div className="bg-green-200 "></div>
+
+      <div style={{ position: "relative", width: "100%", height: "630px" }}>
         <MapContainer
           style={{ height: "100%", minHeight: "100%" }}
           center={[-7.015, 110.42]}
@@ -52,7 +112,7 @@ const GeoComponent = ({ data, resumeTotal }: GeoComponentType) => {
 
           <GeoJSON
             ref={geoRef}
-            key={JSON.stringify(data)}
+            key={JSON.stringify([...data, status])}
             data={semarangData}
             filter={(e) => {
               let districtName = e.properties.name;
@@ -103,48 +163,94 @@ const GeoComponent = ({ data, resumeTotal }: GeoComponentType) => {
                 },
                 mouseout: (e) => {
                   geoRef.current?.resetStyle(e.target);
-                  layer.unbindPopup();
+                  layer.closePopup();
                   setkecamatan("");
                   setTotal([0, 0]);
                 },
               });
             }}
             style={(e) => {
-              return {
-                weight: 2,
-                fillOpacity: 0.7,
-                fillColor: "#FED976",
-                dashArray: "3",
-              };
+              if (e == undefined) {
+                return {};
+              }
+
+              return getColor(data, e);
             }}
           ></GeoJSON>
         </MapContainer>
 
-        <div
-          style={{
-            position: "absolute",
-            width: 150,
-            height: 100,
-            background: "#FFF",
-            top: 20,
-            right: 20,
-            zIndex: 9999,
-          }}
-        >
-          {kecamatan == "" ? (
-            <div>
-              Kota Semarang
-              <br />- ditolak - {resumeTotal[0]}
-              <br />- Sk Terbit - {resumeTotal[1]}
+        <div className="absolute min-w-40 bg-white top-5 right-5 z-9999 px-4">
+          <div>
+            <p className="font-semibold text-xl">Total</p>
+            <div className="flex  space-x-2 h-12">
+              <div className="w-2 h-10 bg-red-700 "></div>
+
+              <div className="flex flex-col-reverse pb-1">
+                <p className="text-base  ">{resumeTotal[0]}</p>
+
+                <p className="text-xs ">Ditolak</p>
+              </div>
             </div>
-          ) : (
-            <div>
-              kec {kecamatan}
-              <br />- ditolak - {total[0]}
-              <br />- Sk Terbit - {total[1]}
+
+            <div className="flex  space-x-2 h-12 pb-1">
+              <div className="w-2 h-10 bg-green-600 "></div>
+
+              <div className="flex flex-col-reverse">
+                <p className="text-base  ">{resumeTotal[1]}</p>
+
+                <p className="text-xs ">Sk Terbit</p>
+              </div>
+            </div>
+          </div>
+
+          {kecamatan != "" && (
+            <div className="mt-5">
+              <p className="font-semibold text-xl">
+                {kecamatan == "" ? "Kota Semarang" : kecamatan}
+              </p>
+              <div className="flex  space-x-2 h-12">
+                <div className="w-2 h-10 bg-red-700 "></div>
+
+                <div className="flex flex-col-reverse pb-1">
+                  <p className="text-base  ">{total[0]}</p>
+
+                  <p className="text-xs ">Ditolak</p>
+                </div>
+              </div>
+
+              <div className="flex  space-x-2 h-12 pb-1">
+                <div className="w-2 h-10 bg-green-600 "></div>
+
+                <div className="flex flex-col-reverse">
+                  <p className="text-base  ">{total[1]}</p>
+
+                  <p className="text-xs ">Sk Terbit</p>
+                </div>
+              </div>
             </div>
           )}
         </div>
+
+        <ButtonGroup className="absolute bottom-8  left-1 bg-white">
+          <Button
+            appearance={status == "ditolak" ? "primary" : "ghost"}
+            color={status == "ditolak" ? "red" : undefined}
+            onClick={() => {
+              setStatus("ditolak");
+            }}
+          >
+            Ditolak
+          </Button>
+          <Button
+            appearance={status == "terbit" ? "primary" : "ghost"}
+            color={status == "terbit" ? "green" : undefined}
+            onClick={() => {
+              setStatus("terbit");
+            }}
+          >
+            SK Terbit
+          </Button>
+        </ButtonGroup>
       </div>
     </>
   );

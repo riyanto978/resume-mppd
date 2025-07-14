@@ -3,6 +3,7 @@ import "rsuite/dist/rsuite.min.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./components/geo.css";
 import Wrapper from "./wrapper";
+import "./mian.css";
 
 export const queryClient = new QueryClient({
   defaultOptions: {

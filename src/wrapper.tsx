@@ -60,7 +60,6 @@ const Wrapper = () => {
           <Nav>
             <Nav.Item href="/">Home</Nav.Item>
             <Nav.Item href="/nakes">Tenaga Kesehatan</Nav.Item>
-            <Nav.Item href="/chart">Chart</Nav.Item>
           </Nav>
 
           <Nav pullRight>

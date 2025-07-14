@@ -1,18 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { addDays, addMonths, format, startOfMonth } from "date-fns";
-import React, { useState } from "react";
-import { FaCog } from "react-icons/fa";
-import {
-  Container,
-  Header,
-  Navbar,
-  Nav,
-  Content,
-  Table,
-  Row,
-  FlexboxGrid,
-  SelectPicker,
-} from "rsuite";
+import { format, startOfMonth } from "date-fns";
+import { useState } from "react";
+import { CheckPicker, FlexboxGrid, SelectPicker } from "rsuite";
 import type { DateRange } from "rsuite/esm/DateRangePicker";
 import { axiosClient } from "../config/axios";
 import "./table.css";
@@ -20,7 +9,6 @@ import FlexboxGridItem from "rsuite/esm/FlexboxGrid/FlexboxGridItem";
 import DateRangeComponent from "../components/DateRangeComponent";
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import { Pie } from "react-chartjs-2";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import GeoComponent from "../components/GeoComponent";
 
@@ -41,21 +29,43 @@ type ResumeType = {
 
 const ResumeByDistrict = () => {
   const [range, setRange] = useState<DateRange>([
-    startOfMonth(addMonths(new Date(), -1)),
-    addDays(startOfMonth(new Date()), -1),
+    startOfMonth(new Date()),
+    new Date(),
   ]);
 
   const [tipe, settipe] = useState<string>("");
 
-  const { data = [] } = useQuery<ResumeType>({
-    queryKey: ["resume-district", range, tipe],
+  const [kecamatan, setKecamatan] = useState<string[]>([]);
+
+  const { data: listKecamatan = [] } = useQuery<{ kecamatan: string }[]>({
+    queryKey: ["resume-district-list-kecamatan", range],
     queryFn: async () => {
+      try {
+        let result = await axiosClient.get<{ kecamatan: string }[]>(
+          `kecamatan/list?startDate=${format(
+            range[0],
+            "y-MM-dd"
+          )}&endDate=${format(range[1], "y-MM-dd")}`
+        );
+
+        return result.data;
+      } catch (error) {
+        return [];
+      }
+    },
+  });
+
+  const { data = [] } = useQuery<ResumeType>({
+    queryKey: ["resume-district", range, tipe, kecamatan],
+    queryFn: async () => {
+      let kec = kecamatan.map((e) => `kecamatan[]=${e}`).join("&");
+
       try {
         let result = await axiosClient.get<[]>(
           `resume/district?startDate=${format(
             range[0],
             "y-MM-dd"
-          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}`
+          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}&${kec}`
         );
 
         return result.data;
@@ -89,37 +99,53 @@ const ResumeByDistrict = () => {
         style={{
           marginBottom: "16px",
         }}
+        className="space-x-2"
       >
-        <FlexboxGridItem>
-          <DateRangeComponent onChange={setRange} range={range} />
-        </FlexboxGridItem>
+        <DateRangeComponent onChange={setRange} range={range} />
 
-        <FlexboxGridItem>
-          <SelectPicker
-            label="Tipe"
-            value={tipe}
-            onChange={(e) => {
-              if (e != null) {
-                settipe(e);
-              }
-            }}
-            placeholder="Pilih Tipe"
-            data={[
-              {
-                label: "Semua",
-                value: "",
-              },
-              {
-                label: "Nakes",
-                value: "nakes",
-              },
-              {
-                label: "Named",
-                value: "named",
-              },
-            ]}
-          />
-        </FlexboxGridItem>
+        <SelectPicker
+          label="Tipe"
+          value={tipe}
+          onChange={(e) => {
+            if (e != null) {
+              settipe(e);
+            }
+          }}
+          placeholder="Pilih Tipe"
+          data={[
+            {
+              label: "Semua",
+              value: "",
+            },
+            {
+              label: "Nakes",
+              value: "nakes",
+            },
+            {
+              label: "Named",
+              value: "named",
+            },
+          ]}
+        />
+
+        <CheckPicker
+          label="Kecamatan"
+          value={kecamatan}
+          data={listKecamatan.map((e) => ({
+            label: e.kecamatan,
+            value: e.kecamatan,
+          }))}
+          appearance="default"
+          placeholder="Semua"
+          onClean={() => {
+            setKecamatan([]);
+          }}
+          onSelect={(e) => {
+            if (e) {
+              setKecamatan(e);
+            }
+          }}
+        />
       </FlexboxGrid>
       <FlexboxGrid>
         <FlexboxGridItem colspan={12}>
