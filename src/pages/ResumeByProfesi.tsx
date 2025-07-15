@@ -12,16 +12,23 @@ import { axiosClient } from "../config/axios";
 import { useState } from "react";
 import { format, startOfMonth } from "date-fns";
 import type { DateRange } from "rsuite/esm/DateRangePicker";
-import FlexboxGridItem from "rsuite/esm/FlexboxGrid/FlexboxGridItem";
 import DateRangeComponent from "../components/DateRangeComponent";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Pie } from "react-chartjs-2";
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 type groupReturnType = {
   profesi: string;
 }[];
 
-type KeteranganType = ("Ditolak" | "Dibatalkan" | "SK Diterbitkan")[];
+type groupNakesType = {
+  sk_terbit: number;
+  ditolak: number;
+  profesi: string;
+}[];
 
-export const ListTenagaKesehatan = () => {
+export const ResumeByProfesi = () => {
   const [range, setRange] = useState<DateRange>([
     startOfMonth(new Date()),
     new Date(),
@@ -36,20 +43,15 @@ export const ListTenagaKesehatan = () => {
 
   const [profesi, setprofesi] = useState<string[]>([]);
 
-  const [keterangan, setKeterangan] = useState<KeteranganType>([]);
-
   const { data: rangeProfesi = [] } = useQuery<groupReturnType>({
-    queryKey: ["list-nakes", range, tipe, sort, sortType],
+    queryKey: ["range-nakes", range, tipe],
     queryFn: async () => {
       try {
         let result = await axiosClient.get<[]>(
           `range-nakes?startDate=${format(
             range[0],
             "y-MM-dd"
-          )}&endDate=${format(
-            range[1],
-            "y-MM-dd"
-          )}&tipe=${tipe}&sort=${sort}&sort_type=${sortType}`
+          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}`
         );
 
         setprofesi([]);
@@ -61,17 +63,16 @@ export const ListTenagaKesehatan = () => {
     },
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<groupNakesType>({
     queryKey: [
-      "list-nakes",
-      activePage,
-      limit,
+      "group-nakes",
       range,
       profesi,
       tipe,
+      limit,
+      activePage,
       sort,
       sortType,
-      keterangan,
     ],
     queryFn: async () => {
       try {
@@ -81,22 +82,43 @@ export const ListTenagaKesehatan = () => {
           })
           .join("&");
 
-        let keter = keterangan.map((e) => `keterangan[]=${e}`).join("&");
-
         let result = await axiosClient.get(
-          `list-nakes?${prof}&page=${activePage}&limit=${limit}&startDate=${format(
+          `group-nakes?${prof}&page=${activePage}&limit=${limit}&startDate=${format(
             range[0],
             "y-MM-dd"
           )}&endDate=${format(
             range[1],
             "y-MM-dd"
-          )}&tipe=${tipe}&sort=${sort}&sort_type=${sortType}&${keter}`
+          )}&tipe=${tipe}&sort=${sort}&sort_type=${sortType}`
         );
 
         settotal(result.data.total);
         return result.data.data;
       } catch (error) {
         return [];
+      }
+    },
+  });
+  const { data: dataTotal } = useQuery<[number, number]>({
+    queryKey: ["group-nakes-total", range, profesi, tipe],
+    queryFn: async () => {
+      try {
+        let prof = profesi
+          .map((e) => {
+            return `profesi[]=${e}`;
+          })
+          .join("&");
+
+        let result = await axiosClient.get(
+          `group-nakes/total?${prof}&startDate=${format(
+            range[0],
+            "y-MM-dd"
+          )}&endDate=${format(range[1], "y-MM-dd")}&tipe=${tipe}`
+        );
+
+        return [result.data.ditolak, result.data.terbit];
+      } catch (error) {
+        return [0, 0];
       }
     },
   });
@@ -109,9 +131,14 @@ export const ListTenagaKesehatan = () => {
         <SelectPicker
           label="Tipe"
           value={tipe}
+          onClean={() => {
+            setActivePage(1);
+            settipe("");
+          }}
           onChange={(e) => {
             if (e != null) {
               settipe(e);
+              setActivePage(1);
             }
           }}
           placeholder="Pilih Tipe"
@@ -138,96 +165,76 @@ export const ListTenagaKesehatan = () => {
               value: e.profesi,
             }))}
             appearance="default"
-            placeholder="Semua profesi"
+            label="Profesi"
+            placeholder="Semua"
+            onClean={() => {
+              setActivePage(1);
+              setprofesi([]);
+            }}
             onSelect={(e) => {
               if (e) {
+                setActivePage(1);
                 setprofesi(e);
               }
             }}
           />
         )}
-
-        <CheckPicker
-          label="keterangan"
-          value={keterangan}
-          data={[
-            {
-              label: "Ditolak",
-              value: "Ditolak",
-            },
-            {
-              label: "Dibatalkan",
-              value: "Dibatalkan",
-            },
-            {
-              label: "SK Diterbitkan",
-              value: "SK Diterbitkan",
-            },
-          ]}
-          appearance="default"
-          placeholder="Semua"
-          onClean={(e) => {
-            setKeterangan([]);
-          }}
-          onSelect={(e) => {
-            if (e) {
-              setKeterangan(e);
-            }
-          }}
-        />
       </FlexboxGrid>
 
-      <Table
-        loading={isLoading}
-        height={400}
-        data={data}
-        bordered
-        sortColumn={sort}
-        sortType={sortType}
-        onSortColumn={(a, b) => {
-          setSort(a);
-          setSortType(b ?? "asc");
-        }}
-      >
-        <Column flexGrow={1} align="center" fixed>
-          <HeaderCell>No</HeaderCell>
-          <Cell>
-            {(rowData, index) => (activePage - 1) * limit + (index ?? 0) + 1}
-          </Cell>
-        </Column>
+      <div className="flex">
+        <div className="w-2/3">
+          <Table
+            loading={isLoading}
+            autoHeight
+            data={data}
+            bordered
+            sortColumn={sort}
+            sortType={sortType}
+            onSortColumn={(a, b) => {
+              setSort(a);
+              setSortType(b ?? "asc");
+            }}
+          >
+            <Column flexGrow={2} sortable>
+              <HeaderCell>Profesi</HeaderCell>
+              <Cell dataKey="profesi" />
+            </Column>
+            <Column flexGrow={2}>
+              <HeaderCell>Ditolak</HeaderCell>
+              <Cell dataKey="ditolak" />
+            </Column>
+            <Column flexGrow={2}>
+              <HeaderCell>Sk Diterbitkan</HeaderCell>
+              <Cell dataKey="sk_terbit" />
+            </Column>
+          </Table>
+        </div>
 
-        <Column flexGrow={2} sortable>
-          <HeaderCell>Nomor Register</HeaderCell>
-          <Cell dataKey="nomor_register" />
-        </Column>
-
-        <Column flexGrow={2}>
-          <HeaderCell>Nik</HeaderCell>
-          <Cell dataKey="nik" />
-        </Column>
-
-        <Column flexGrow={2} sortable>
-          <HeaderCell>Nama</HeaderCell>
-          <Cell dataKey="nama" />
-        </Column>
-
-        <Column flexGrow={2} sortable>
-          <HeaderCell>Profesi</HeaderCell>
-          <Cell dataKey="profesi" />
-        </Column>
-        <Column flexGrow={2}>
-          <HeaderCell>Tempat Praktik</HeaderCell>
-          <Cell dataKey="tempat_praktik" />
-        </Column>
-
-        <Column flexGrow={2} sortable>
-          <HeaderCell>Keterangan</HeaderCell>
-          <Cell dataKey="keterangan" />
-        </Column>
-      </Table>
+        <div className="w-1/3">
+          <Pie
+            options={{
+              plugins: {
+                datalabels: {
+                  color: "#FFF",
+                },
+              },
+            }}
+            data={{
+              labels: ["Ditolak", "Sk Terbit"],
+              datasets: [
+                {
+                  label: "My First Dataset",
+                  data: dataTotal,
+                  hoverOffset: 4,
+                  backgroundColor: ["rgb(255, 99, 132)", "rgb(255, 205, 86)"],
+                },
+              ],
+            }}
+          />
+        </div>
+      </div>
 
       <div className="h-8"></div>
-
       <Pagination
         layout={["total", "-", "limit", "|", "pager", "skip"]}
         total={total}

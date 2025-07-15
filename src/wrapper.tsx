@@ -7,6 +7,7 @@ import ResumeByDistrict from "./pages/ResumeByDistrict";
 import withReactContent from "sweetalert2-react-content";
 import Swal from "sweetalert2";
 import { axiosClient } from "./config/axios";
+import { ResumeByProfesi } from "./pages/ResumeByProfesi";
 
 const MySwal = withReactContent(Swal);
 
@@ -60,6 +61,7 @@ const Wrapper = () => {
           <Nav>
             <Nav.Item href="/">Home</Nav.Item>
             <Nav.Item href="/nakes">Tenaga Kesehatan</Nav.Item>
+            <Nav.Item href="/profesi">Resume By Profesi</Nav.Item>
           </Nav>
 
           <Nav pullRight>
@@ -82,6 +84,7 @@ const Wrapper = () => {
           <Routes>
             <Route path="/" element={<ResumeByDistrict />} />
             <Route path="/nakes" element={<ListTenagaKesehatan />} />
+            <Route path="/profesi" element={<ResumeByProfesi />} />
           </Routes>
         </BrowserRouter>
       </Content>
